@@ -617,7 +617,8 @@ Switch ($remoteAADSync) {
 #region Create cloud only admin account
 #####################################################################################################################################
 write-host "Connectig to the Microsoft 365 Tenant" -ForegroundColor Magenta -NoNewline
-write-host " - Please enter the credentials..." -ForegroundColor Yellow 
+write-host " - Please enter the credentials..." -ForegroundColor Yellow
+$cloudCreds = Get-Credential
 Start-Sleep -s 5
 if (Get-Module -ListAvailable -Name MSOnline) {
     Write-Host "MSOnline Module Already Installed" -ForegroundColor Green
@@ -628,7 +629,7 @@ else {
     Write-Host "MSOnline Module Installed" -ForegroundColor Green
 }
 Import-Module MSOnline
-Connect-MSOlService
+Connect-MSOlService -Credential $cloudCreds
 Start-Sleep -s 2
 
 #########################################################################################################################################################################
@@ -675,7 +676,7 @@ Start-Sleep -s 3
 #Load Azure Active Directory PowerShell Module
 
 write-host "Connectig Azure Active Directory" -ForegroundColor Magenta -NoNewline
-write-host " - Please enter the credentials..." -ForegroundColor Yellow 
+#write-host " - Please enter the credentials..." -ForegroundColor Yellow 
 Start-Sleep -s 5
 if (Get-Module -ListAvailable -Name AzureADPreview) {
     Write-Host "AzureADPreview Module Already Installed" -ForegroundColor Green
@@ -686,7 +687,7 @@ else {
     Write-Host "AzureADPreview Module Installed" -ForegroundColor Green
 }
 Import-Module AzureADPreview
-Connect-AzureAD
+Connect-AzureAD -Credential $cloudCreds
 Start-Sleep -s 2
 
 #########################################################################################################################################################################
@@ -832,7 +833,7 @@ if ($aadlicmodule -ne 0){
 
 #connect to Azure
 try{
-    Connect-AzAccount
+    Connect-AzAccount -Credential $cloudCreds
     Write-Log -type SUCCESS -Message "Connected to Azure AD through ""Connect-AzACcount""" -logOnly
 }catch{
 	Write-Log -type ERROR -Message "Could not connect to AzureAD through ""Connect AzACcount""" + $_
