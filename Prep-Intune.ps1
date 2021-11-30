@@ -842,7 +842,7 @@ try{
 }
 
 #Getting created License Groups
-$licgrpscreated = $grouptableIntuneL.GetEnumerator().where({ !$grpsnotcreatedInt.Contains($_.Key) }) | ft -HideTableHeaders
+$licgrpscreated = $grouptableIntuneL.GetEnumerator().where({ !$grpsnotcreatedInt.Contains($_.Key) }) #| ft -HideTableHeaders
 
 #getting available licenses
 Write-Log -type INFO -Message 'Getting available licenses'
@@ -872,11 +872,18 @@ if ($licsnotFound.Count > 0)
 }
 $groupsAndIds = @{}
 
+
 #create mapping table for groups and IDs
-foreach ($item in $grouptableIntuneL.getEnumerator()){
-    $ID = (Get-MsolGroup | where-object { $_.DisplayName -eq $item.Key}).ObjectID
-    $groupsAndIds.add($item.Key,$ID)
-}
+$licgrpscreated.ForEach({
+		$ID = (Get-MsolGroup | where-object { $_.DisplayName -eq $_.Name }).ObjectID
+		$groupsAndIds.add($_.Name, $ID)
+	})
+
+<# old code
+foreach ($item in $licgrpscreated){
+    $ID = (Get-MsolGroup | where-object { $_.DisplayName -eq $item.Name}).ObjectID
+    $groupsAndIds.add($item.Name,$ID)
+}#>
 
 #Assign licenses to groups
 Write-Log -type INFO -Message "Assigning available licenses to groups..."
