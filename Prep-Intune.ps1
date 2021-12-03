@@ -6,7 +6,7 @@
        Created by:         Drago Petrovic | Dominic Manning
        Organization:       MSB365.blog
        Filename:           Prep-Intune.ps1
-       Current version:    V1.00     
+       Current version:    V1.10     
 
        Find us on:
              * Website:         https://www.msb365.blog
@@ -80,6 +80,7 @@
 			 V0.94, 2021/11/25 - DrPe - Bugfixing: Creating dynamic Groups on Azure
 			 V0.95, 2021/11/25 - DoMa - Bugfixing: License assignments
              V1.00, 2021/12/01 - DrPe - Finalising "Go Live" Version of the Intune preperation Script
+			 V1.10, 2021/12/03 - DrPe - Configuring: download from Github "CreateScheduleTask.ps1 and CreateScheduleTask.bat"
 			 
 
 
@@ -180,9 +181,9 @@ function Write-Log
 #endregion
 
 #region Set variables
-write-host "PowerShell Script for Intune preparation by Drago Petrovic" -ForegroundColor White -BackgroundColor Magenta
+write-host "PowerShell Script for Intune preparation by Drago Petrovic and Dominic Manning" -ForegroundColor White -BackgroundColor Magenta
 Start-Sleep -s 2
-write-host "Script version V1.00" -ForegroundColor White -BackgroundColor Magenta
+write-host "Script version V1.10" -ForegroundColor White -BackgroundColor Magenta
 Start-Sleep -s 3
 write-host "Before we start, we need some core information:" -ForegroundColor Magenta
 Start-Sleep -s 3
@@ -332,6 +333,48 @@ write-host "NOTE: You need to configure the AAD Sync so that all created groups 
 Start-Sleep -s 2
 #endregion
 #########################################################################################################################################################################
+###create Sub directory
+$mdmdirectory = "C:\MDM\PS_Temp\"
+write-host "Checking if Sub Directory $mdmdirectory exists..." -ForegroundColor Cyan
+Start-Sleep -s 1
+If ((Test-Path -Path $mdmdirectory) -eq $false)
+{
+    try{
+        write-host "Creating Sub Directory $mdmdirectory..." -ForegroundColor Magenta
+        Start-Sleep -s 2
+        New-Item -Path $mdmdirectory -ItemType directory -ErrorAction Stop
+        Start-Sleep -s 1
+        write-host "$mdmdirectory created" -ForegroundColor Green
+    }catch{
+        throw "Could not create folder ""$mdmdirectory"" for logs. " + $_
+        Return
+    }
+        
+}
+
+
+##Download ScheduleTask Script from Github
+Start-Sleep -s 3
+write-host "Downloading Powershell Subscript for ScheduleTask from Github..." -ForegroundColor Magenta
+Start-Sleep -s 1
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/MSB365/CreateScheduleTaskForMDMEnrollment/main/CreateScheduleTask.ps1" -OutFile "C:\MDM\PS_Temp\CreateScheduleTask.ps1"
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/MSB365/CreateScheduleTaskForMDMEnrollment/main/CreateScheduleTask.bat" -OutFile "C:\MDM\PS_Temp\CreateScheduleTask.bat"
+Start-Sleep -s 1
+$filenamescript = "CreateScheduleTask.ps1"
+$filenamescript1 = "CreateScheduleTask.bat"
+Start-Sleep -s 1
+write-host "The Powershell Subscript $filenamescript successfully downloaded from Github." -ForegroundColor Green
+Start-Sleep -s 1
+write-host "Moving the $filenamescript File to NETLOGON" -ForegroundColor Cyan
+write-host "Moving the $filenamescript1 File to NETLOGON" -ForegroundColor Cyan
+Start-Sleep -s 1
+Copy-Item "C:\MDM\PS_Temp\CreateScheduleTask.ps1" -Destination "\\localhost\NETLOGON"
+Copy-Item "C:\MDM\PS_Temp\CreateScheduleTask.bat" -Destination "\\localhost\NETLOGON"
+Start-Sleep -s 1
+write-host "$filenamescript moved!" -ForegroundColor Green
+write-host "$filenamescript1 moved!" -ForegroundColor Green
+Start-Sleep -s 3
+#########################################################################################################################################################################
 
 #region OUs and Group Policies
 Write-Log -Message "Setting up GPO tasks for MDM..." -type INFO
@@ -440,6 +483,7 @@ try{
     Set-GPPrefRegistryValue -Name "Intune_Automatic_MDM_enrollment" -Action Update -Context Computer -Key "HKLM\Software\Policies\Microsoft\Windows\CurrentVersion\MDM" -Type DWord -ValueName "AutoEnrollMDM" -Value 1 -ErrorAction Stop
     Set-GPPrefRegistryValue -Name "Intune_Automatic_MDM_enrollment" -Action Update -Context Computer -Key "HKLM\Software\Policies\Microsoft\Windows\CurrentVersion\MDM" -Type DWord -ValueName "UseAADCredentialType" -Value 1 -ErrorAction Stop
     Set-GPPrefRegistryValue -Name "Intune_Automatic_MDM_enrollment" -Context Computer -Key "HKLM\Software\Policies\Microsoft\Windows\CurrentVersion\MDM" -ValueName "MDMApplicationId" -Value "" -Type String -Action Update -ErrorAction Stop
+	Set-GPPrefRegistryValue -Name "Intune_Automatic_MDM_enrollment" -Context Computer -Key "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run" -ValueName "command" -Value "\\%UserDNSdomain%\NETLOGON\CreateScheduleTask.bat" -Type ExpandString -Action Update -ErrorAction Stop
     Write-Log -type SUCCESS -Message "Set registry key Intune_SCP_Tenant_Information wit tenant name" -logOnly
 }catch{
 	Write-Log -type ERROR -Message "could not set registry key HKLM\Software\Policies\Microsoft\Windows\CurrentVersion\MDM --> DisableRegistration. $_"
@@ -574,51 +618,13 @@ Else
 }
 
 
-<# Old version
-if (Test-Path -Path $Folder) {
-    write-host "Path exists!" -ForegroundColor Green
-} else {
-    "Path doesn't exist."
-}
 
-Start-Sleep -s 1
-
-if (Test-Path -Path $Folder) {
-write-host "Checking if $Folder exists..." -ForegroundColor White -ForegroundColor Magenta
-Start-Sleep -s 2
-Import-Module -Name "C:\Program Files\Microsoft Azure AD Sync\Bin\ADSync" -Verbose
-Start-Sleep -s 10                                                                                                                  
-    write-host "Syncing on-premise objects to Azure Active Directory..." -ForegroundColor Magenta                                      
-    Try {
-            Start-ADSyncSyncCycle -PolicyType Delta -ErrorAction Stop
-            sleep -s 30
-            Do {
-                $aadsyncstatus = Get-ADSyncConnectorRunStatus
-                sleep -s 6
-                } 
-                until($aadsyncstatus -eq $null)
-                write-host "Done!" -ForegroundColor Green
-        }
-        Catch{
-        Write-Log -type WARNING -Message "Could not start AADSync. Objects may not be synced to AAD yet"
-    }   
-                    
-
-} else {
-Write-Host "ADSync is not installed on this machine" -ForegroundColor Yellow
-Switch ($remoteAADSync) {
-        y {$AADSyncServer = Read-Host "Enter name of AADC server"}
-        n {"AAD Sync will not be started manually. You have to wait for the next sync cycle"}
-        default{"AAD Sync will not be started manually. You have to wait for the next sync cycle"}
-}
-}#>
 #endregion
 #####################################################################################################################################
 #region Create cloud only admin account
 #####################################################################################################################################
 write-host "Connectig to the Microsoft 365 Tenant" -ForegroundColor Magenta -NoNewline
-write-host " - Please enter the credentials..." -ForegroundColor Yellow
-$cloudCreds = Get-Credential
+write-host " - Please enter the credentials..." -ForegroundColor Yellow 
 Start-Sleep -s 5
 if (Get-Module -ListAvailable -Name MSOnline) {
     Write-Host "MSOnline Module Already Installed" -ForegroundColor Green
@@ -629,7 +635,7 @@ else {
     Write-Host "MSOnline Module Installed" -ForegroundColor Green
 }
 Import-Module MSOnline
-Connect-MSOlService -Credential $cloudCreds
+Connect-MSOlService
 Start-Sleep -s 2
 
 #########################################################################################################################################################################
@@ -676,7 +682,7 @@ Start-Sleep -s 3
 #Load Azure Active Directory PowerShell Module
 
 write-host "Connectig Azure Active Directory" -ForegroundColor Magenta -NoNewline
-#write-host " - Please enter the credentials..." -ForegroundColor Yellow 
+write-host " - Please enter the credentials..." -ForegroundColor Yellow 
 Start-Sleep -s 5
 if (Get-Module -ListAvailable -Name AzureADPreview) {
     Write-Host "AzureADPreview Module Already Installed" -ForegroundColor Green
@@ -687,7 +693,7 @@ else {
     Write-Host "AzureADPreview Module Installed" -ForegroundColor Green
 }
 Import-Module AzureADPreview
-Connect-AzureAD -Credential $cloudCreds
+Connect-AzureAD
 Start-Sleep -s 2
 
 #########################################################################################################################################################################
@@ -833,7 +839,7 @@ if ($aadlicmodule -ne 0){
 
 #connect to Azure
 try{
-    Connect-AzAccount -Credential $cloudCreds
+    Connect-AzAccount
     Write-Log -type SUCCESS -Message "Connected to Azure AD through ""Connect-AzACcount""" -logOnly
 }catch{
 	Write-Log -type ERROR -Message "Could not connect to AzureAD through ""Connect AzACcount""" + $_
@@ -842,7 +848,7 @@ try{
 }
 
 #Getting created License Groups
-$licgrpscreated = $grouptableIntuneL.GetEnumerator().where({ !$grpsnotcreatedInt.Contains($_.Key) }) #| ft -HideTableHeaders
+$licgrpscreated = $grouptableIntuneL.GetEnumerator().where({ !$grpsnotcreatedInt.Contains($_.Key) }) | ft -HideTableHeaders
 
 #getting available licenses
 Write-Log -type INFO -Message 'Getting available licenses'
@@ -872,18 +878,11 @@ if ($licsnotFound.Count > 0)
 }
 $groupsAndIds = @{}
 
-
 #create mapping table for groups and IDs
-$licgrpscreated.ForEach({
-		$ID = (Get-MsolGroup | where-object { $_.DisplayName -eq $_.Name }).ObjectID
-		$groupsAndIds.add($_.Name, $ID)
-	})
-
-<# old code
-foreach ($item in $licgrpscreated){
-    $ID = (Get-MsolGroup | where-object { $_.DisplayName -eq $item.Name}).ObjectID
-    $groupsAndIds.add($item.Name,$ID)
-}#>
+foreach ($item in $grouptableIntuneL.getEnumerator()){
+    $ID = (Get-MsolGroup | where-object { $_.DisplayName -eq $item.Key}).ObjectID
+    $groupsAndIds.add($item.Key,$ID)
+}
 
 #Assign licenses to groups
 Write-Log -type INFO -Message "Assigning available licenses to groups..."
