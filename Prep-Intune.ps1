@@ -483,7 +483,7 @@ try{
     Set-GPPrefRegistryValue -Name "Intune_Automatic_MDM_enrollment" -Action Update -Context Computer -Key "HKLM\Software\Policies\Microsoft\Windows\CurrentVersion\MDM" -Type DWord -ValueName "AutoEnrollMDM" -Value 1 -ErrorAction Stop
     Set-GPPrefRegistryValue -Name "Intune_Automatic_MDM_enrollment" -Action Update -Context Computer -Key "HKLM\Software\Policies\Microsoft\Windows\CurrentVersion\MDM" -Type DWord -ValueName "UseAADCredentialType" -Value 1 -ErrorAction Stop
     Set-GPPrefRegistryValue -Name "Intune_Automatic_MDM_enrollment" -Context Computer -Key "HKLM\Software\Policies\Microsoft\Windows\CurrentVersion\MDM" -ValueName "MDMApplicationId" -Value "" -Type String -Action Update -ErrorAction Stop
-	Set-GPPrefRegistryValue -Name "Intune_Automatic_MDM_enrollment" -Context Computer -Key "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run" -ValueName "command" -Value "\\%UserDNSdomain%\NETLOGON\CreateScheduleTask.bat" -Type ExpandString -Action Update -ErrorAction Stop
+    Set-GPPrefRegistryValue -Name "Intune_Automatic_MDM_enrollment" -Context Computer -Key "HKLM\Software\Microsoft\Windows\CurrentVersion\Run" -ValueName "command" -Value "\\%UserDNSdomain%\NETLOGON\CreateScheduleTask.bat" -Type ExpandString -Action Update -ErrorAction Stop
     Write-Log -type SUCCESS -Message "Set registry key Intune_SCP_Tenant_Information wit tenant name" -logOnly
 }catch{
 	Write-Log -type ERROR -Message "could not set registry key HKLM\Software\Policies\Microsoft\Windows\CurrentVersion\MDM --> DisableRegistration. $_"
