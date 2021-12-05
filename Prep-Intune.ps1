@@ -6,7 +6,7 @@
        Created by:         Drago Petrovic | Dominic Manning
        Organization:       MSB365.blog
        Filename:           Prep-Intune.ps1
-       Current version:    V1.10     
+       Current version:    V1.11     
 
        Find us on:
              * Website:         https://www.msb365.blog
@@ -81,6 +81,7 @@
 			 V0.95, 2021/11/25 - DoMa - Bugfixing: License assignments
              V1.00, 2021/12/01 - DrPe - Finalising "Go Live" Version of the Intune preperation Script
 			 V1.10, 2021/12/03 - DrPe - Configuring: download from Github "CreateScheduleTask.ps1 and CreateScheduleTask.bat"
+			 V1.11, 2021/12/05 - DrPe - Configuring GPO entries for trusted Intranet and Sites
 			 
 
 
@@ -183,7 +184,7 @@ function Write-Log
 #region Set variables
 write-host "PowerShell Script for Intune preparation by Drago Petrovic and Dominic Manning" -ForegroundColor White -BackgroundColor Magenta
 Start-Sleep -s 2
-write-host "Script version V1.10" -ForegroundColor White -BackgroundColor Magenta
+write-host "Script version V1.11" -ForegroundColor White -BackgroundColor Magenta
 Start-Sleep -s 3
 write-host "Before we start, we need some core information:" -ForegroundColor Magenta
 Start-Sleep -s 3
@@ -402,6 +403,17 @@ Start-Sleep -s 2
 Write-Log -Message "Creating Organizational Unit for MDM..." -type INFO
 Start-Sleep -s 1
 
+# Get further variables
+$env:HostIP = (
+    Get-NetIPConfiguration |
+    Where-Object {
+        $_.IPv4DefaultGateway -ne $null -and
+        $_.NetAdapter.Status -ne "Disconnected"
+    }
+).IPv4Address.IPAddress
+
+
+$currentdomain = Get-ADDomain -Current LocalComputer | select dnsroot
 
 #store OU names to array
 $intuneOUNames = @("Intune_Enrolled","Intune_Unmanaged","AutoPilotDomainJoin")
@@ -483,7 +495,11 @@ try{
     Set-GPPrefRegistryValue -Name "Intune_Automatic_MDM_enrollment" -Action Update -Context Computer -Key "HKLM\Software\Policies\Microsoft\Windows\CurrentVersion\MDM" -Type DWord -ValueName "AutoEnrollMDM" -Value 1 -ErrorAction Stop
     Set-GPPrefRegistryValue -Name "Intune_Automatic_MDM_enrollment" -Action Update -Context Computer -Key "HKLM\Software\Policies\Microsoft\Windows\CurrentVersion\MDM" -Type DWord -ValueName "UseAADCredentialType" -Value 1 -ErrorAction Stop
     Set-GPPrefRegistryValue -Name "Intune_Automatic_MDM_enrollment" -Context Computer -Key "HKLM\Software\Policies\Microsoft\Windows\CurrentVersion\MDM" -ValueName "MDMApplicationId" -Value "" -Type String -Action Update -ErrorAction Stop
-    Set-GPPrefRegistryValue -Name "Intune_Automatic_MDM_enrollment" -Context Computer -Key "HKLM\Software\Microsoft\Windows\CurrentVersion\Run" -ValueName "command" -Value "\\%UserDNSdomain%\NETLOGON\CreateScheduleTask.bat" -Type ExpandString -Action Update -ErrorAction Stop
+	Set-GPPrefRegistryValue -Name "Intune_Automatic_MDM_enrollment" -Context Computer -Key "HKLM\Software\Microsoft\Windows\CurrentVersion\Run" -ValueName "command" -Value "\\%UserDNSdomain%\NETLOGON\CreateScheduleTask.bat" -Type ExpandString -Action Update -ErrorAction Stop
+	Set-GPPrefRegistryValue -Name "Intune_Automatic_MDM_enrollment" -Context Computer -Key "HKLM\Software\Policies\Microsoft\Windows\CurrentVersion\MDM" -ValueName "Trusted IP Range" -Value "$env:HostIP" -Type String -Action Update -ErrorAction Stop
+	Set-GPPrefRegistryValue -Name "Intune_Automatic_MDM_enrollment" -Action Update -Context Computer -Key "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings\ZoneMap\Domains\$currentdomain\*\" -Type DWord -ValueName "Trusted local IntranetZone" -Value 1 -ErrorAction Stop
+	Set-GPPrefRegistryValue -Name "Intune_Automatic_MDM_enrollment" -Action Update -Context Computer -Key "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings\ZoneMap\Domains\$currentdomain\*\" -Type DWord -ValueName "Trusted local Sites" -Value 2 -ErrorAction Stop
+
     Write-Log -type SUCCESS -Message "Set registry key Intune_SCP_Tenant_Information wit tenant name" -logOnly
 }catch{
 	Write-Log -type ERROR -Message "could not set registry key HKLM\Software\Policies\Microsoft\Windows\CurrentVersion\MDM --> DisableRegistration. $_"
